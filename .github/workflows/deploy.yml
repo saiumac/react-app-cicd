@@ -40,7 +40,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Step 6: Assume the IAM Role with improved credential handling
+      # Step 6: Assume the IAM Role
       - name: Assume Role
         id: assume-role
         run: |
@@ -48,7 +48,7 @@ jobs:
           CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session --region us-east-1 2>&1)
           echo "Credentials output: $CREDENTIALS"
 
-          # Extracting credentials safely and removing potential line breaks
+          # Extracting credentials safely
           ACCESS_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.AccessKeyId | tr -d '\r\n')
           SECRET_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.SecretAccessKey | tr -d '\r\n')
           SESSION_TOKEN=$(echo "$CREDENTIALS" | jq -r .Credentials.SessionToken | tr -d '\r\n')
@@ -70,6 +70,9 @@ jobs:
       # Step 7: Verify Environment Variables
       - name: Verify Environment Variables
         run: |
+          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
           echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:4}********"
           echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:0:4}********"
           echo "AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:0:4}********"
