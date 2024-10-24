@@ -33,29 +33,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y awscli jq
 
-      # Step 5: Debug AWS Caller Identity
-      - name: Debug AWS Caller Identity
-        run: aws sts get-caller-identity
+      # Step 5: Debug Initial AWS Caller Identity
+      - name: Debug Initial AWS Caller Identity
+        run: aws sts get-caller-identity --region us-east-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Step 6: Assume the IAM Role
+      # Step 6: Assume the IAM Role with detailed error logging
       - name: Assume Role
         id: assume-role
         run: |
           echo "Attempting to assume role: arn:aws:iam::590184025278:role/s3"
-          CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session || echo "Assume role failed")
+          CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session --region us-east-1 2>&1)
           echo "Credentials output: $CREDENTIALS"
+          
+          # Extracting credentials
           ACCESS_KEY=$(echo $CREDENTIALS | jq -r .Credentials.AccessKeyId)
           SECRET_KEY=$(echo $CREDENTIALS | jq -r .Credentials.SecretAccessKey)
           SESSION_TOKEN=$(echo $CREDENTIALS | jq -r .Credentials.SessionToken)
 
+          # Check if role assumption failed
           if [[ -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$SESSION_TOKEN" ]]; then
-            echo "Error: Failed to assume the role. Check trust policy and permissions."
+            echo "Error: Failed to assume the role. Review the trust policy and IAM user permissions."
             exit 1
           fi
 
+          # Set environment variables for temporary credentials
           echo "AWS_ACCESS_KEY_ID=$ACCESS_KEY" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=$SECRET_KEY" >> $GITHUB_ENV
           echo "AWS_SESSION_TOKEN=$SESSION_TOKEN" >> $GITHUB_ENV
@@ -66,8 +70,10 @@ jobs:
       # Step 7: Debug AWS CLI after role assumption
       - name: Debug AWS CLI after Role Assumption
         run: |
-          aws sts get-caller-identity
-          aws s3 ls
+          echo "Caller identity after assuming role:"
+          aws sts get-caller-identity --region us-east-1
+          echo "Listing S3 buckets:"
+          aws s3 ls --region us-east-1
         env:
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
