@@ -40,7 +40,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Step 6: Assume the IAM Role with detailed error logging
+      # Step 6: Assume the IAM Role with improved credential handling
       - name: Assume Role
         id: assume-role
         run: |
@@ -48,10 +48,10 @@ jobs:
           CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session --region us-east-1 2>&1)
           echo "Credentials output: $CREDENTIALS"
 
-          # Extracting credentials safely
-          ACCESS_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.AccessKeyId)
-          SECRET_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.SecretAccessKey)
-          SESSION_TOKEN=$(echo "$CREDENTIALS" | jq -r .Credentials.SessionToken)
+          # Extracting credentials safely and removing potential line breaks
+          ACCESS_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.AccessKeyId | tr -d '\r\n')
+          SECRET_KEY=$(echo "$CREDENTIALS" | jq -r .Credentials.SecretAccessKey | tr -d '\r\n')
+          SESSION_TOKEN=$(echo "$CREDENTIALS" | jq -r .Credentials.SessionToken | tr -d '\r\n')
 
           # Check if role assumption failed
           if [[ -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$SESSION_TOKEN" ]]; then
