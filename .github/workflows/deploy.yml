@@ -33,20 +33,38 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y awscli jq
 
-      # Step 5: Assume the IAM Role
-      - name: Assume Role
-        id: assume-role
-        run: |
-          CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session)
-          echo "AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r .Credentials.AccessKeyId)" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r .Credentials.SecretAccessKey)" >> $GITHUB_ENV
-          echo "AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r .Credentials.SessionToken)" >> $GITHUB_ENV
+      # Step 5: Debug AWS Caller Identity
+      - name: Debug AWS Caller Identity
+        run: aws sts get-caller-identity
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Step 6: Debug AWS CLI (Optional)
-      - name: Debug AWS CLI
+      # Step 6: Assume the IAM Role
+      - name: Assume Role
+        id: assume-role
+        run: |
+          echo "Attempting to assume role: arn:aws:iam::590184025278:role/s3"
+          CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::590184025278:role/s3 --role-session-name github-session || echo "Assume role failed")
+          echo "Credentials output: $CREDENTIALS"
+          ACCESS_KEY=$(echo $CREDENTIALS | jq -r .Credentials.AccessKeyId)
+          SECRET_KEY=$(echo $CREDENTIALS | jq -r .Credentials.SecretAccessKey)
+          SESSION_TOKEN=$(echo $CREDENTIALS | jq -r .Credentials.SessionToken)
+
+          if [[ -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$SESSION_TOKEN" ]]; then
+            echo "Error: Failed to assume the role. Check trust policy and permissions."
+            exit 1
+          fi
+
+          echo "AWS_ACCESS_KEY_ID=$ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$SECRET_KEY" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$SESSION_TOKEN" >> $GITHUB_ENV
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Step 7: Debug AWS CLI after role assumption
+      - name: Debug AWS CLI after Role Assumption
         run: |
           aws sts get-caller-identity
           aws s3 ls
@@ -55,7 +73,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
 
-      # Step 7: Deploy the React app to S3
+      # Step 8: Deploy the React app to S3
       - name: Deploy to S3
         run: aws s3 sync ./build s3://my-react-app-bucket-12345 --region us-east-1 --delete
         env:
