@@ -1,9 +1,9 @@
-name: Deploy React App to S3
+name: Deploy React App to S3 with IAM Role
 
 on:
   push:
     branches:
-      - main  # Runs whenever code is pushed to the main branch
+      - main  # Triggers on push to the main branch
 
 jobs:
   deploy:
@@ -27,9 +27,38 @@ jobs:
       - name: Build React app
         run: npm run build
 
-      # Step 4: Deploy the React app to S3
-      - name: Deploy to S3
-        run: aws s3 sync ./build s3://my-react-app-bucket-12345 --delete
+      # Step 4: Install AWS CLI and jq
+      - name: Install AWS CLI and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli jq
+
+      # Step 5: Assume the IAM Role
+      - name: Assume Role
+        id: assume-role
+        run: |
+          CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME --role-session-name github-session)
+          echo "AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r .Credentials.AccessKeyId)" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r .Credentials.SecretAccessKey)" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r .Credentials.SessionToken)" >> $GITHUB_ENV
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Step 6: Debug AWS CLI
+      - name: Debug AWS CLI
+        run: |
+          aws sts get-caller-identity
+          aws s3 ls
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
+
+      # Step 7: Deploy the React app to S3
+      - name: Deploy to S3
+        run: aws s3 sync ./build s3://my-react-app-bucket-12345 --region us-east-1 --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
